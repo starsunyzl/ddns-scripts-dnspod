@@ -17,14 +17,14 @@
 
 由于 OpenWrt 各种魔改版泛滥，界面五花八门，此处仅以原版 OpenWrt 为例。登录 OpenWrt 网页，导航到 Services / Dynamic DNS 页面，点击 Add new services 按钮添加服务，DDNS Service provider 选择 dnspod（通常在列表的最下面），Create service 后填写如下 Basic Settings 必填项：
 
-- Lookup Hostname：完整域名，用于检查对应的 IP 是否需要更新。例：www.example.com 、 example.com
-- Domain：要更新的主机记录@主域名，例：www@example.com，省略主机记录则更新主域名，例：@example.com 或 example.com
-- Username：你的腾讯云 API 密钥 SecretId
-- Password：你的腾讯云 API 密钥 SecretKey
-- Optional Encoded Parameter：要更新的主机记录 RecordId。此插件只更新记录，不新增记录，因此你需要事先在腾讯云控制台人工添加一条记录，否则没有对应的 RecordId。添加记录后使用腾讯云的 API Explorer 在线发起 [DescribeRecordList](https://console.cloud.tencent.com/api/explorer?Product=dnspod&Version=2021-03-23&Action=DescribeRecordList) API 调用获取主机记录的 RecordId，有时间再实现自动获取 RecordId
-- Optional Parameter：要更新的主机记录线路，中文，例：默认
+- Lookup Hostname：`完整域名`，用于检查对应的 IP 是否需要更新。例：`www.example.com`、`example.com`
+- Domain：要更新的 `主机记录@主域名`，例：`www@example.com`，省略 `主机记录` 则更新 `主域名`，例：`@example.com` 或 `example.com`
+- Username：你的腾讯云 API 密钥 `SecretId`
+- Password：你的腾讯云 API 密钥 `SecretKey`
+- Optional Encoded Parameter：要更新的主机记录 `RecordId`。此插件只更新记录，不新增记录，因此你需要事先在腾讯云控制台人工添加一条记录，否则没有对应的 `RecordId`。添加记录后使用腾讯云的 API Explorer 在线发起 [`DescribeRecordList`](https://console.cloud.tencent.com/api/explorer?Product=dnspod&Version=2021-03-23&Action=DescribeRecordList) API 调用获取主机记录的 `RecordId`。有时间再实现自动获取 `RecordId`
+- Optional Parameter：要更新的主机记录 `线路`，中文，例：`默认`
 - Use HTTP Secure：勾选
-- Path to CA-Certificate：/etc/ssl/certs
+- Path to CA-Certificate：`/etc/ssl/certs`
 
 其他项根据自身需求填写。
 
