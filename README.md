@@ -5,13 +5,13 @@
 1. 安装 OpenWrt 官方 DDNS 客户端和其它依赖包：  
 `opkg install luci-app-ddns curl openssl-util`
 2. 下载最新的插件包：  
-https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip
+`https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip`
 3. 将插件包中的 usr 目录上传到 OpenWrt 根目录 /
 4. 设置执行权限：  
 `chmod 755 /usr/lib/ddns/update_dnspod.sh`
 5. 重启 OpenWrt
 
-若有空再提供 ipk 安装包。
+有时间再提供 ipk 安装包。
 
 ## 使用
 
@@ -21,7 +21,7 @@ https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip
 - Domain：要更新的主机记录@主域名，例：www@example.com，省略主机记录则更新主域名，例：@example.com 或 example.com
 - Username：你的腾讯云 API 密钥 SecretId
 - Password：你的腾讯云 API 密钥 SecretKey
-- Optional Encoded Parameter：要更新的主机记录 RecordId。此插件只更新记录，不新增记录，因此你需要事先在腾讯云控制台人工添加一条记录，否则没有对应的 RecordId。添加记录后使用腾讯云的 API Explorer 在线发起 [DescribeRecordList](https://console.cloud.tencent.com/api/explorer?Product=dnspod&Version=2021-03-23&Action=DescribeRecordList) API 调用获取主机记录的 RecordId
+- Optional Encoded Parameter：要更新的主机记录 RecordId。此插件只更新记录，不新增记录，因此你需要事先在腾讯云控制台人工添加一条记录，否则没有对应的 RecordId。添加记录后使用腾讯云的 API Explorer 在线发起 [DescribeRecordList](https://console.cloud.tencent.com/api/explorer?Product=dnspod&Version=2021-03-23&Action=DescribeRecordList) API 调用获取主机记录的 RecordId，有时间再实现自动获取 RecordId
 - Optional Parameter：要更新的主机记录线路，中文，例：默认
 - Use HTTP Secure：勾选
 - Path to CA-Certificate：/etc/ssl/certs
