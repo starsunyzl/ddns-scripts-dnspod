@@ -15,7 +15,7 @@
 
 ## 使用
 
-由于 OpenWrt 各种魔改版泛滥，界面五花八门，此处仅以原版 OpenWrt 为例。登录 OpenWrt 网页，导航到 Services / Dynamic DNS 页面，点击 Add new services 按钮添加服务，DDNS Service provider 选择 dnspod（通常在列表的最下面），Create service 后填写如下 Basic Settings 必填项：
+OpenWrt 各种魔改版泛滥，仅以原版 OpenWrt 为例。登录 OpenWrt 网页，导航到 Services / Dynamic DNS 页面，点击 Add new services 按钮添加服务，IPv4和IPv6需要分别单独添加服务，DDNS Service provider 选择 dnspod（通常在列表的最下面），Create service 后填写如下 Basic Settings 必填项：
 
 - Lookup Hostname：`完整域名`，用于检查对应的 IP 是否需要更新。例：`www.example.com`、`example.com`
 - Domain：要更新的 `主机记录@主域名`，例：`www@example.com`，省略 `主机记录` 则更新 `主域名`，例：`@example.com` 或 `example.com`
@@ -27,6 +27,8 @@
 - Path to CA-Certificate：`/etc/ssl/certs`
 
 其他项根据自身需求填写。
+
+腾讯云 API 3.0 使用了更安全、更严格的签名认证方式，要求 OpenWrt 系统时间和标准时间的误差不能超过 5 分钟，否则会认证失败。
 
 ## 作者
 
