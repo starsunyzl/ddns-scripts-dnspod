@@ -14,8 +14,8 @@
 # given data:
 # example.com or @example.com for "domain record"
 # host.sub@example.com for a "host record"
-local __HOST="$(printf %s "$domain" | cut -d@ -f1)"
-local __DOMAIN="$(printf %s "$domain" | cut -d@ -f2)"
+local __HOST="$(printf "%s" "$domain" | cut -d@ -f1)"
+local __DOMAIN="$(printf "%s" "$domain" | cut -d@ -f2)"
 
 # __DOMAIN = the base domain i.e. example.com
 # __HOST   = host.sub if updating a host record or
@@ -28,53 +28,44 @@ local __RECORD_ID="$param_enc"
 local __RECORD_LINE="$param_opt"
 
 # __RECORD_LINE must be in Chinese, utf-8 encoding
-# "\xe9\xbb\x98\xe8\xae\xa4" means "default" in English.
+# "\xe9\xbb\x98\xe8\xae\xa4" means "default" in English
 [ -z "$__RECORD_LINE" ] && __RECORD_LINE="$(printf "\xe9\xbb\x98\xe8\xae\xa4")"
+
+local __RECORD_TYPE="A"
+[ $use_ipv6 -eq 1 ] && __RECORD_TYPE="AAAA"
 
 # __REQUEST_HOST and __REQUEST_CONTENT_TYPE must be lowercase
 local __REQUEST_HOST="dnspod.tencentcloudapi.com"
 local __REQUEST_URL="https://$__REQUEST_HOST"
 local __REQUEST_SERVICE="dnspod"
+local __REQUEST_ACTION="ModifyRecord"
+local __REQUEST_VERSION="2021-03-23"
 local __REQUEST_CONTENT_TYPE="application/json"  # ; charset=utf-8
 local __REQUEST_DATE="$(date -u +%Y-%m-%d)"
 local __REQUEST_TIMESTAMP="$(date -u +%s)"
-
-local __REQUEST_ACTION __REQUEST_VERSION __REQUEST_BODY
-
-# ModifyDynamicDNS doesn't support IPv6 yet, so we need ModifyRecord.
-# Although ModifyRecord supports both IPv4 and IPv6, updating with ModifyDynamicDNS 
-# has a much smaller TTL value and seems to be better suited for DDNS.
-if [ $use_ipv6 -eq 0 ]; then
-  __REQUEST_ACTION="ModifyDynamicDNS"
-  __REQUEST_VERSION="2021-03-23"
-  __REQUEST_BODY="{\"Domain\":\"$__DOMAIN\",\"SubDomain\":\"$__HOST\",\"RecordId\":$__RECORD_ID,\"RecordLine\":\"$__RECORD_LINE\",\"Value\":\"$__IP\"}"
-else
-  __REQUEST_ACTION="ModifyRecord"
-  __REQUEST_VERSION="2021-03-23"
-  __REQUEST_BODY="{\"Domain\":\"$__DOMAIN\",\"SubDomain\":\"$__HOST\",\"RecordId\":$__RECORD_ID,\"RecordLine\":\"$__RECORD_LINE\",\"RecordType\":\"AAAA\",\"Value\":\"$__IP\"}"
-fi
-
-local __PROG_PARAM
+local __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"SubDomain\": \"$__HOST\", \"RecordId\": $__RECORD_ID, \"RecordLine\": \"$__RECORD_LINE\", \"RecordType\": \"$__RECORD_TYPE\", \"Value\": \"$__IP\"}"
+local __REQUEST_PARAM
 
 sha256() {
   local __MSG="$1"
-  echo -en "$__MSG" | openssl sha256 | sed "s/^.* //"
+  printf "$__MSG" | openssl sha256 | sed "s/^.* //"
 }
 
 hmac_sha256_plainkey() {
   local __KEY="$1"
   local __MSG="$2"
-  echo -en "$__MSG" | openssl sha256 -hmac "$__KEY" | sed "s/^.* //"
+  printf "$__MSG" | openssl sha256 -hmac "$__KEY" | sed "s/^.* //"
 }
 
 hmac_sha256_hexkey() {
   local __KEY="$1"
   local __MSG="$2"
-  echo -en "$__MSG" | openssl sha256 -mac hmac -macopt "hexkey:$__KEY" | sed "s/^.* //"
+  printf "$__MSG" | openssl sha256 -mac hmac -macopt "hexkey:$__KEY" | sed "s/^.* //"
 }
 
 dnspod_transfer() {
-  local __URL="$__REQUEST_URL"
+  local __URL="$1"
+  local __PARAM="$2"
   local __ERR=0
   local __CNT=0  # error counter
   local __PROG __RUNPROG
@@ -83,7 +74,7 @@ dnspod_transfer() {
   [ -z "$bind_network" ] && [ "$ip_source" = "network" ] && [ "$ip_network" ] && bind_network="$ip_network"
 
   __PROG="$CURL -RsS -o $DATFILE --stderr $ERRFILE"
-  __PROG="$__PROG $__PROG_PARAM"
+  __PROG="$__PROG $__PARAM"
   # check HTTPS support
   [ -z "$CURL_SSL" -a $use_https -eq 1 ] && \
     write_log 13 "cURL: libcurl compiled without https support"
@@ -154,24 +145,37 @@ dnspod_transfer() {
   write_log 12 "Error in 'dnspod_transfer()' - program coding error"
 }
 
-local __HASHED_REQUEST_PAYLOAD="$(sha256 $__REQUEST_BODY)"
+local __HASHED_REQUEST_PAYLOAD="$(sha256 "$__REQUEST_BODY")"
+local __CANONICAL_REQUEST="$(cat <<EOF
+POST
+/
 
-local __CANONICAL_REQUEST="POST\n/\n\ncontent-type:$__REQUEST_CONTENT_TYPE\nhost:$__REQUEST_HOST\n\ncontent-type;host\n$__HASHED_REQUEST_PAYLOAD"
+content-type:$__REQUEST_CONTENT_TYPE
+host:$__REQUEST_HOST
 
-local __HASHED_CANONICAL_REQUEST="$(sha256 $__CANONICAL_REQUEST)"
+content-type;host
+$__HASHED_REQUEST_PAYLOAD
+EOF
+)"
+local __HASHED_CANONICAL_REQUEST="$(sha256 "$__CANONICAL_REQUEST")"
+local __STRING_TO_SIGN="$(cat <<EOF
+TC3-HMAC-SHA256
+$__REQUEST_TIMESTAMP
+$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request
+$__HASHED_CANONICAL_REQUEST
+EOF
+)"
 
-local __STRING_TO_SIGN="TC3-HMAC-SHA256\n$__REQUEST_TIMESTAMP\n$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request\n$__HASHED_CANONICAL_REQUEST"
-
-local __SECRET_DATE="$(hmac_sha256_plainkey "TC3$__SECRET_KEY" $__REQUEST_DATE)"
-local __SECRET_SERVICE="$(hmac_sha256_hexkey $__SECRET_DATE $__REQUEST_SERVICE)"
-local __SECRET_SIGNING="$(hmac_sha256_hexkey $__SECRET_SERVICE "tc3_request")"
-local __SIGNATURE="$(hmac_sha256_hexkey $__SECRET_SIGNING $__STRING_TO_SIGN)"
+local __SECRET_DATE="$(hmac_sha256_plainkey "TC3$__SECRET_KEY" "$__REQUEST_DATE")"
+local __SECRET_SERVICE="$(hmac_sha256_hexkey "$__SECRET_DATE" "$__REQUEST_SERVICE")"
+local __SECRET_SIGNING="$(hmac_sha256_hexkey "$__SECRET_SERVICE" "tc3_request")"
+local __SIGNATURE="$(hmac_sha256_hexkey "$__SECRET_SIGNING" "$__STRING_TO_SIGN")"
 
 local __AUTHORIZATION="TC3-HMAC-SHA256 Credential=$__SECRET_ID/$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request, SignedHeaders=content-type;host, Signature=$__SIGNATURE"
 
-__PROG_PARAM="-H 'Authorization: $__AUTHORIZATION' -H 'Content-Type: $__REQUEST_CONTENT_TYPE' -H 'Host: $__REQUEST_HOST' -H 'X-TC-Action: $__REQUEST_ACTION' -H 'X-TC-Version: $__REQUEST_VERSION' -H 'X-TC-Timestamp: $__REQUEST_TIMESTAMP' -d '$__REQUEST_BODY'"
+__REQUEST_PARAM="-H 'Authorization: $__AUTHORIZATION' -H 'Content-Type: $__REQUEST_CONTENT_TYPE' -H 'Host: $__REQUEST_HOST' -H 'X-TC-Action: $__REQUEST_ACTION' -H 'X-TC-Version: $__REQUEST_VERSION' -H 'X-TC-Timestamp: $__REQUEST_TIMESTAMP' -d '$__REQUEST_BODY'"
 
-dnspod_transfer || return 1
+dnspod_transfer "$__REQUEST_URL" "$__REQUEST_PARAM" || return 1
 
 write_log 7 "DDNS Provider answered:\n$(cat $DATFILE)"
 
