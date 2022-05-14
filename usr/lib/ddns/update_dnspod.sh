@@ -7,7 +7,6 @@
 [ -z "$domain" ] && write_log 14 "Service section not configured correctly! Missing 'domain'"
 [ -z "$username" ] && write_log 14 "Service section not configured correctly! Missing SecretId as 'username'"
 [ -z "$password" ] && write_log 14 "Service section not configured correctly! Missing SecretKey as 'password'"
-[ -z "$param_enc" ] && write_log 14 "Service section not configured correctly! Missing RecordId as 'param_enc'"
 [ $use_https -eq 0 ] && use_https=1  # force HTTPS
 
 # split __HOST __DOMAIN from $domain
@@ -24,7 +23,6 @@ local __DOMAIN="$(printf "%s" "$domain" | cut -d@ -f2)"
 
 local __SECRET_ID="$username"
 local __SECRET_KEY="$password"
-local __RECORD_ID="$param_enc"
 local __RECORD_LINE="$param_opt"
 
 # __RECORD_LINE must be in Chinese, utf-8 encoding
@@ -33,18 +31,6 @@ local __RECORD_LINE="$param_opt"
 
 local __RECORD_TYPE="A"
 [ $use_ipv6 -eq 1 ] && __RECORD_TYPE="AAAA"
-
-# __REQUEST_HOST and __REQUEST_CONTENT_TYPE must be lowercase
-local __REQUEST_HOST="dnspod.tencentcloudapi.com"
-local __REQUEST_URL="https://$__REQUEST_HOST"
-local __REQUEST_SERVICE="dnspod"
-local __REQUEST_ACTION="ModifyRecord"
-local __REQUEST_VERSION="2021-03-23"
-local __REQUEST_CONTENT_TYPE="application/json"  # ; charset=utf-8
-local __REQUEST_DATE="$(date -u +%Y-%m-%d)"
-local __REQUEST_TIMESTAMP="$(date -u +%s)"
-local __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"SubDomain\": \"$__HOST\", \"RecordId\": $__RECORD_ID, \"RecordLine\": \"$__RECORD_LINE\", \"RecordType\": \"$__RECORD_TYPE\", \"Value\": \"$__IP\"}"
-local __REQUEST_PARAM
 
 sha256() {
   local __MSG="$1"
@@ -61,6 +47,53 @@ hmac_sha256_hexkey() {
   local __KEY="$1"
   local __MSG="$2"
   printf "$__MSG" | openssl sha256 -mac hmac -macopt "hexkey:$__KEY" | sed "s/^.* //"
+}
+
+dnspod_build_request_param() {
+  # API function name and JSON parameters
+  local __REQUEST_ACTION="$1"
+  local __REQUEST_BODY="$2"
+
+  # __REQUEST_HOST and __REQUEST_CONTENT_TYPE must be lowercase
+  # Generally all APIs under the same __REQUEST_SERVICE have the same __REQUEST_VERSION,
+  # if they are different, you need to put __REQUEST_VERSION in the parameter of this function
+  local __REQUEST_HOST="dnspod.tencentcloudapi.com"
+  local __REQUEST_SERVICE="dnspod"
+  local __REQUEST_VERSION="2021-03-23"
+  local __REQUEST_CONTENT_TYPE="application/json"  # ; charset=utf-8
+  local __REQUEST_DATE="$(date -u +%Y-%m-%d)"
+  local __REQUEST_TIMESTAMP="$(date -u +%s)"
+
+  local __HASHED_REQUEST_PAYLOAD="$(sha256 "$__REQUEST_BODY")"
+  local __CANONICAL_REQUEST="$(cat <<EOF
+POST
+/
+
+content-type:$__REQUEST_CONTENT_TYPE
+host:$__REQUEST_HOST
+
+content-type;host
+$__HASHED_REQUEST_PAYLOAD
+EOF
+)"
+  local __HASHED_CANONICAL_REQUEST="$(sha256 "$__CANONICAL_REQUEST")"
+  local __STRING_TO_SIGN="$(cat <<EOF
+TC3-HMAC-SHA256
+$__REQUEST_TIMESTAMP
+$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request
+$__HASHED_CANONICAL_REQUEST
+EOF
+)"
+
+  local __SECRET_DATE="$(hmac_sha256_plainkey "TC3$__SECRET_KEY" "$__REQUEST_DATE")"
+  local __SECRET_SERVICE="$(hmac_sha256_hexkey "$__SECRET_DATE" "$__REQUEST_SERVICE")"
+  local __SECRET_SIGNING="$(hmac_sha256_hexkey "$__SECRET_SERVICE" "tc3_request")"
+  local __SIGNATURE="$(hmac_sha256_hexkey "$__SECRET_SIGNING" "$__STRING_TO_SIGN")"
+
+  local __AUTHORIZATION="TC3-HMAC-SHA256 Credential=$__SECRET_ID/$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request, SignedHeaders=content-type;host, Signature=$__SIGNATURE"
+
+  local __REQUEST_PARAM="-H 'Authorization: $__AUTHORIZATION' -H 'Content-Type: $__REQUEST_CONTENT_TYPE' -H 'Host: $__REQUEST_HOST' -H 'X-TC-Action: $__REQUEST_ACTION' -H 'X-TC-Version: $__REQUEST_VERSION' -H 'X-TC-Timestamp: $__REQUEST_TIMESTAMP' -d '$__REQUEST_BODY'"
+  printf "%s" "$__REQUEST_PARAM"
 }
 
 dnspod_transfer() {
@@ -145,42 +178,47 @@ dnspod_transfer() {
   write_log 12 "Error in 'dnspod_transfer()' - program coding error"
 }
 
-local __HASHED_REQUEST_PAYLOAD="$(sha256 "$__REQUEST_BODY")"
-local __CANONICAL_REQUEST="$(cat <<EOF
-POST
-/
-
-content-type:$__REQUEST_CONTENT_TYPE
-host:$__REQUEST_HOST
-
-content-type;host
-$__HASHED_REQUEST_PAYLOAD
-EOF
-)"
-local __HASHED_CANONICAL_REQUEST="$(sha256 "$__CANONICAL_REQUEST")"
-local __STRING_TO_SIGN="$(cat <<EOF
-TC3-HMAC-SHA256
-$__REQUEST_TIMESTAMP
-$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request
-$__HASHED_CANONICAL_REQUEST
-EOF
-)"
-
-local __SECRET_DATE="$(hmac_sha256_plainkey "TC3$__SECRET_KEY" "$__REQUEST_DATE")"
-local __SECRET_SERVICE="$(hmac_sha256_hexkey "$__SECRET_DATE" "$__REQUEST_SERVICE")"
-local __SECRET_SIGNING="$(hmac_sha256_hexkey "$__SECRET_SERVICE" "tc3_request")"
-local __SIGNATURE="$(hmac_sha256_hexkey "$__SECRET_SIGNING" "$__STRING_TO_SIGN")"
-
-local __AUTHORIZATION="TC3-HMAC-SHA256 Credential=$__SECRET_ID/$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request, SignedHeaders=content-type;host, Signature=$__SIGNATURE"
-
-__REQUEST_PARAM="-H 'Authorization: $__AUTHORIZATION' -H 'Content-Type: $__REQUEST_CONTENT_TYPE' -H 'Host: $__REQUEST_HOST' -H 'X-TC-Action: $__REQUEST_ACTION' -H 'X-TC-Version: $__REQUEST_VERSION' -H 'X-TC-Timestamp: $__REQUEST_TIMESTAMP' -d '$__REQUEST_BODY'"
+local __REQUEST_URL="https://dnspod.tencentcloudapi.com"
+local __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"Subdomain\": \"$__HOST\", \"RecordLine\": \"$__RECORD_LINE\", \"RecordType\": \"$__RECORD_TYPE\"}"
+local __REQUEST_PARAM="$(dnspod_build_request_param "DescribeRecordList" "$__REQUEST_BODY")"
 
 dnspod_transfer "$__REQUEST_URL" "$__REQUEST_PARAM" || return 1
 
-write_log 7 "DDNS Provider answered:\n$(cat $DATFILE)"
-
-grep -iF "Error" $DATFILE >/dev/null 2>&1
+write_log 7 "DescribeRecordList answered:\n$(cat $DATFILE)"
+grep '"Error":' $DATFILE >/dev/null 2>&1
 [ $? -eq 0 ] && return 1
 
-grep -iE "\"RecordId\": *$__RECORD_ID" $DATFILE >/dev/null 2>&1
+grep -E '"ListCount": *1[^0-9]' $DATFILE >/dev/null 2>&1
+[ $? -eq 1 ] && {
+  write_log 3 "RecordId not found or not unique"
+  return 1
+}
+
+local __RECORD_ID="$(grep -oE '"RecordId": *[0-9]+' $DATFILE | grep -oE "[0-9]+")"
+write_log 7 "RecordId: $__RECORD_ID"
+
+local __RECODE_VALUE="$(grep -oE '"Value": *"[0-9a-zA-Z.:]+"' $DATFILE | cut -d\" -f4)"
+write_log 7 "RecordValue: $__RECODE_VALUE"
+
+local __UP_TO_DATE=0
+[ "$__RECODE_VALUE" = "$__IP" ] && __UP_TO_DATE=1
+
+[ $__UP_TO_DATE -eq 1 ] && {
+  write_log 6 "IP is already up to date"
+  return 0
+}
+
+__REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"SubDomain\": \"$__HOST\", \"RecordLine\": \"$__RECORD_LINE\", \"RecordId\": $__RECORD_ID, \"RecordType\": \"$__RECORD_TYPE\", \"Value\": \"$__IP\"}"
+__REQUEST_PARAM="$(dnspod_build_request_param "ModifyRecord" "$__REQUEST_BODY")"
+
+>$DATFILE
+>$ERRFILE
+dnspod_transfer "$__REQUEST_URL" "$__REQUEST_PARAM" || return 1
+
+write_log 7 "ModifyRecord answered:\n$(cat $DATFILE)"
+
+grep '"Error":' $DATFILE >/dev/null 2>&1
+[ $? -eq 0 ] && return 1
+
+grep -E "\"RecordId\": *$__RECORD_ID" $DATFILE >/dev/null 2>&1
 return $?  # "0" if found
