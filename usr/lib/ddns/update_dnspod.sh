@@ -3,6 +3,8 @@
 # author: starsunyzl
 # see https://github.com/starsunyzl/ddns-scripts-dnspod for more details
 
+. /usr/share/libubox/jshn.sh
+
 [ -z "$CURL" ] && [ -z "$CURL_SSL" ] && write_log 14 "DNSPod communication require cURL with SSL support. Please install"
 [ -z "$domain" ] && write_log 14 "Service section not configured correctly! Missing 'domain'"
 [ -z "$username" ] && write_log 14 "Service section not configured correctly! Missing SecretId as 'username'"
@@ -13,8 +15,8 @@
 # given data:
 # example.com or @example.com for "domain record"
 # host.sub@example.com for a "host record"
-local __HOST="$(printf "%s" "$domain" | cut -d@ -f1)"
-local __DOMAIN="$(printf "%s" "$domain" | cut -d@ -f2)"
+local __HOST="$(printf %s "$domain" | cut -d@ -f1)"
+local __DOMAIN="$(printf %s "$domain" | cut -d@ -f2)"
 
 # __DOMAIN = the base domain i.e. example.com
 # __HOST   = host.sub if updating a host record or
@@ -26,8 +28,7 @@ local __SECRET_KEY="$password"
 local __RECORD_LINE="$param_opt"
 
 # __RECORD_LINE must be in Chinese, utf-8 encoding
-# "\xe9\xbb\x98\xe8\xae\xa4" means "default" in English
-[ -z "$__RECORD_LINE" ] && __RECORD_LINE="$(printf "\xe9\xbb\x98\xe8\xae\xa4")"
+[ -z "$__RECORD_LINE" ] && __RECORD_LINE="默认"
 
 local __RECORD_TYPE="A"
 [ $use_ipv6 -eq 1 ] && __RECORD_TYPE="AAAA"
@@ -49,7 +50,7 @@ hmac_sha256_hexkey() {
   printf "$__MSG" | openssl sha256 -mac hmac -macopt "hexkey:$__KEY" | sed "s/^.* //"
 }
 
-dnspod_build_request_param() {
+build_request_param() {
   # API function name and JSON parameters
   local __REQUEST_ACTION="$1"
   local __REQUEST_BODY="$2"
@@ -93,7 +94,7 @@ EOF
   local __AUTHORIZATION="TC3-HMAC-SHA256 Credential=$__SECRET_ID/$__REQUEST_DATE/$__REQUEST_SERVICE/tc3_request, SignedHeaders=content-type;host, Signature=$__SIGNATURE"
 
   local __REQUEST_PARAM="-H 'Authorization: $__AUTHORIZATION' -H 'Content-Type: $__REQUEST_CONTENT_TYPE' -H 'Host: $__REQUEST_HOST' -H 'X-TC-Action: $__REQUEST_ACTION' -H 'X-TC-Version: $__REQUEST_VERSION' -H 'X-TC-Timestamp: $__REQUEST_TIMESTAMP' -d '$__REQUEST_BODY'"
-  printf "%s" "$__REQUEST_PARAM"
+  printf %s "$__REQUEST_PARAM"
 }
 
 dnspod_transfer() {
@@ -180,28 +181,38 @@ dnspod_transfer() {
 
 local __REQUEST_URL="https://dnspod.tencentcloudapi.com"
 local __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"Subdomain\": \"$__HOST\", \"RecordLine\": \"$__RECORD_LINE\", \"RecordType\": \"$__RECORD_TYPE\"}"
-local __REQUEST_PARAM="$(dnspod_build_request_param "DescribeRecordList" "$__REQUEST_BODY")"
+local __REQUEST_PARAM="$(build_request_param "DescribeRecordList" "$__REQUEST_BODY")"
 
 dnspod_transfer "$__REQUEST_URL" "$__REQUEST_PARAM" || return 1
 
 write_log 7 "DescribeRecordList answered:\n$(cat $DATFILE)"
-grep '"Error":' $DATFILE >/dev/null 2>&1
-[ $? -eq 0 ] && return 1
 
-grep -E '"ListCount": *1[^0-9]' $DATFILE >/dev/null 2>&1
-[ $? -eq 1 ] && {
+json_init
+json_load_file $DATFILE
+json_select Response
+json_get_var __ERROR Error
+
+[ -n "$__ERROR" ] && return 1
+
+json_select RecordCountInfo
+json_get_var __LIST_COUNT ListCount
+
+[ -z "$__LIST_COUNT" -o $__LIST_COUNT -ne 1 ] && {
   write_log 3 "RecordId not found or not unique"
   return 1
 }
 
-local __RECORD_ID="$(grep -oE '"RecordId": *[0-9]+' $DATFILE | grep -oE "[0-9]+")"
+json_select ..
+json_select RecordList
+json_select 1
+json_get_var __RECORD_ID RecordId
 write_log 7 "RecordId: $__RECORD_ID"
 
-local __RECODE_VALUE="$(grep -oE '"Value": *"[0-9a-zA-Z.:]+"' $DATFILE | cut -d\" -f4)"
+json_get_var __RECODE_VALUE Value
 write_log 7 "RecordValue: $__RECODE_VALUE"
 
 local __UP_TO_DATE=0
-[ "$__RECODE_VALUE" = "$__IP" ] && __UP_TO_DATE=1
+[ -n "$__RECODE_VALUE" -a "$__RECODE_VALUE" = "$__IP" ] && __UP_TO_DATE=1
 
 [ $__UP_TO_DATE -eq 1 ] && {
   write_log 6 "IP is already up to date"
@@ -209,7 +220,7 @@ local __UP_TO_DATE=0
 }
 
 __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"SubDomain\": \"$__HOST\", \"RecordLine\": \"$__RECORD_LINE\", \"RecordId\": $__RECORD_ID, \"RecordType\": \"$__RECORD_TYPE\", \"Value\": \"$__IP\"}"
-__REQUEST_PARAM="$(dnspod_build_request_param "ModifyRecord" "$__REQUEST_BODY")"
+__REQUEST_PARAM="$(build_request_param "ModifyRecord" "$__REQUEST_BODY")"
 
 >$DATFILE
 >$ERRFILE
@@ -217,8 +228,12 @@ dnspod_transfer "$__REQUEST_URL" "$__REQUEST_PARAM" || return 1
 
 write_log 7 "ModifyRecord answered:\n$(cat $DATFILE)"
 
-grep '"Error":' $DATFILE >/dev/null 2>&1
-[ $? -eq 0 ] && return 1
+json_init
+json_load_file $DATFILE
+json_select Response
+json_get_var __ERROR Error
 
-grep -E "\"RecordId\": *$__RECORD_ID" $DATFILE >/dev/null 2>&1
-return $?  # "0" if found
+[ -n "$__ERROR" ] && return 1
+
+json_get_var __RECORD_ID RecordId
+[ -n "$__RECORD_ID"  ] && return 0 || return 1
