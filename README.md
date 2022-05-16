@@ -21,7 +21,6 @@ OpenWrt 魔改版众多，以原版为例。登录 OpenWrt 网页，导航到 Se
 - Domain：要更新的 `主机记录@主域名`，例：`www@example.com`，省略 `主机记录` 则更新 `主域名`，例：`@example.com` 或 `example.com`
 - Username：你的腾讯云 API 密钥 `SecretId`
 - Password：你的腾讯云 API 密钥 `SecretKey`
-- Optional Parameter：选填，要更新的主机记录 `线路`，中文，例：`默认`、`电信`，不填时等于 `默认`
 
 其他项如代理、更新间隔时间等根据自身需求填写，使用 IPv6 时需要在 Advanced Settings / Network 选择对应的网络接口。
 

@@ -25,10 +25,6 @@ local __DOMAIN="$(printf %s "$domain" | cut -d@ -f2)"
 
 local __SECRET_ID="$username"
 local __SECRET_KEY="$password"
-local __RECORD_LINE="$param_opt"
-
-# __RECORD_LINE must be in Chinese, utf-8 encoding
-[ -z "$__RECORD_LINE" ] && __RECORD_LINE="默认"
 
 local __RECORD_TYPE="A"
 [ $use_ipv6 -eq 1 ] && __RECORD_TYPE="AAAA"
@@ -180,7 +176,7 @@ dnspod_transfer() {
 }
 
 local __REQUEST_URL="https://dnspod.tencentcloudapi.com"
-local __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"Subdomain\": \"$__HOST\", \"RecordLine\": \"$__RECORD_LINE\", \"RecordType\": \"$__RECORD_TYPE\"}"
+local __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"Subdomain\": \"$__HOST\", \"RecordType\": \"$__RECORD_TYPE\"}"
 local __REQUEST_PARAM="$(build_request_param "DescribeRecordList" "$__REQUEST_BODY")"
 
 dnspod_transfer "$__REQUEST_URL" "$__REQUEST_PARAM" || return 1
@@ -208,18 +204,22 @@ json_select 1
 json_get_var __RECORD_ID RecordId
 write_log 7 "RecordId: $__RECORD_ID"
 
-json_get_var __RECODE_VALUE Value
-write_log 7 "RecordValue: $__RECODE_VALUE"
+json_get_var __RECORD_VALUE Value
+write_log 7 "RecordValue: $__RECORD_VALUE"
+
+# LineId is a string type
+json_get_var __RECORD_LINE_ID LineId
+write_log 7 "RecordLineId: $__RECORD_LINE_ID"
 
 local __UP_TO_DATE=0
-[ -n "$__RECODE_VALUE" -a "$__RECODE_VALUE" = "$__IP" ] && __UP_TO_DATE=1
+[ -n "$__RECORD_VALUE" -a "$__RECORD_VALUE" = "$__IP" ] && __UP_TO_DATE=1
 
 [ $__UP_TO_DATE -eq 1 ] && {
   write_log 6 "IP is already up to date"
   return 0
 }
 
-__REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"SubDomain\": \"$__HOST\", \"RecordLine\": \"$__RECORD_LINE\", \"RecordId\": $__RECORD_ID, \"RecordType\": \"$__RECORD_TYPE\", \"Value\": \"$__IP\"}"
+__REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"SubDomain\": \"$__HOST\", \"RecordLine\": \"unused\", \"RecordLineId\": \"$__RECORD_LINE_ID\", \"RecordId\": $__RECORD_ID, \"RecordType\": \"$__RECORD_TYPE\", \"Value\": \"$__IP\"}"
 __REQUEST_PARAM="$(build_request_param "ModifyRecord" "$__REQUEST_BODY")"
 
 >$DATFILE
