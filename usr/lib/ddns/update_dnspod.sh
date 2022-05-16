@@ -25,7 +25,7 @@ local __DOMAIN="$(printf %s "$domain" | cut -d@ -f2)"
 
 local __SECRET_ID="$username"
 local __SECRET_KEY="$password"
-
+local __RECORD_ID="$param_enc"
 local __RECORD_TYPE="A"
 [ $use_ipv6 -eq 1 ] && __RECORD_TYPE="AAAA"
 
@@ -185,40 +185,56 @@ write_log 7 "DescribeRecordList answered:\n$(cat $DATFILE)"
 
 json_init
 json_load_file $DATFILE
+
+local __ERROR
 json_select Response
 json_get_var __ERROR Error
-
 [ -n "$__ERROR" ] && return 1
 
-json_select RecordCountInfo
-json_get_var __LIST_COUNT ListCount
+local __LIST_IDX=1
+local __RECORD_ID_TMP __RECORD_VALUE __RECORD_LINE_ID
+if json_is_a RecordList array; then
+  json_select RecordList
+  while json_is_a $__LIST_IDX object; do
+    json_select $__LIST_IDX
+    json_get_var __RECORD_ID_TMP RecordId
+    write_log 7 "RecordId: $__RECORD_ID_TMP"
 
-[ -z "$__LIST_COUNT" -o $__LIST_COUNT -ne 1 ] && {
-  write_log 3 "RecordId not found or not unique"
+    json_get_var __RECORD_VALUE Value
+    write_log 7 "RecordValue: $__RECORD_VALUE"
+
+    json_get_var __RECORD_LINE_ID LineId
+    write_log 7 "RecordLineId: $__RECORD_LINE_ID"
+
+    json_select ..
+    __LIST_IDX=$(( __LIST_IDX + 1 ))
+
+    [ -n "$__RECORD_ID" -a "$__RECORD_ID" = "$__RECORD_ID_TMP" ] && break
+  done
+fi
+
+[ -z "$__RECORD_ID_TMP" -o -z "$__RECORD_LINE_ID" ] && {
+  write_log 3 "Failed to get RecordId or RecordLineId"
   return 1
 }
 
-json_select ..
-json_select RecordList
-json_select 1
-json_get_var __RECORD_ID RecordId
-write_log 7 "RecordId: $__RECORD_ID"
+if [ -z "$__RECORD_ID" ]; then
+  if [ $__LIST_IDX -gt 2 ]; then
+    write_log 3 "Get multiple RecordId, one of which must be configured in the 'param_enc' option"
+    return 1
+  fi
+  __RECORD_ID="$__RECORD_ID_TMP"
+elif [ "$__RECORD_ID" != "$__RECORD_ID_TMP" ]; then
+  write_log 3 "The configured RecordId was not found in the fetched record"
+  return 1
+fi
 
-json_get_var __RECORD_VALUE Value
-write_log 7 "RecordValue: $__RECORD_VALUE"
-
-# LineId is a string type
-json_get_var __RECORD_LINE_ID LineId
-write_log 7 "RecordLineId: $__RECORD_LINE_ID"
-
-local __UP_TO_DATE=0
-[ -n "$__RECORD_VALUE" -a "$__RECORD_VALUE" = "$__IP" ] && __UP_TO_DATE=1
-
-[ $__UP_TO_DATE -eq 1 ] && {
+[ -n "$__RECORD_VALUE" -a "$__RECORD_VALUE" = "$__IP" ] && {
   write_log 6 "IP is already up to date"
   return 0
 }
 
+# RecordLineId is a string type
 __REQUEST_BODY="{\"Domain\": \"$__DOMAIN\", \"SubDomain\": \"$__HOST\", \"RecordLine\": \"unused\", \"RecordLineId\": \"$__RECORD_LINE_ID\", \"RecordId\": $__RECORD_ID, \"RecordType\": \"$__RECORD_TYPE\", \"Value\": \"$__IP\"}"
 __REQUEST_PARAM="$(build_request_param "ModifyRecord" "$__REQUEST_BODY")"
 
@@ -230,10 +246,10 @@ write_log 7 "ModifyRecord answered:\n$(cat $DATFILE)"
 
 json_init
 json_load_file $DATFILE
+
 json_select Response
 json_get_var __ERROR Error
-
 [ -n "$__ERROR" ] && return 1
 
-json_get_var __RECORD_ID RecordId
-[ -n "$__RECORD_ID"  ] && return 0 || return 1
+json_get_var __RECORD_ID_TMP RecordId
+[ -n "$__RECORD_ID_TMP" ] && return 0 || return 1
