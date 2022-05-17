@@ -6,7 +6,7 @@
 `opkg install luci-app-ddns bind-host curl openssl-util`
 2. 下载最新的插件包：  
 `https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip`
-3. 将插件包中的 `usr` 目录上传到 OpenWrt 根目录 /
+3. 将插件包中的 `usr` 目录上传到 OpenWrt 根目录 `/`
 4. 设置执行权限：  
 `chmod 755 /usr/lib/ddns/update_dnspod.sh`
 5. 重启 OpenWrt
@@ -27,7 +27,7 @@ OpenWrt 魔改版众多，以原版为例。登录 OpenWrt 网页，导航到 Se
 
 腾讯云 API 3.0 使用了更安全、更严格的签名认证方式，要求 OpenWrt 系统时间和标准时间的误差不能超过 5 分钟，否则会认证失败。
 
-当一个主机记录有多个记录类型相同的 IP 记录值时，官方 DDNS 客户端只取第一条 IP 记录值进行显示和检测，可能和你设置的 `RecordId` 对应的 IP 记录值不同，不必理会，插件会正确检测 `RecordId` 对应的 IP 记录值，当已经是最新时不会再更新。
+当一个主机记录有多个记录类型相同的 IP 记录值时，官方 DDNS 客户端只检测和显示第一条 IP 记录值，这可能与你设置的 `RecordId` 对应的 IP 记录值不同，不必理会，插件会正确检测 `RecordId` 对应的 IP 记录值，当已经是最新时不会再更新。
 
 在原版 OpenWrt 21.02.x 上测试正常，其他版本未测试。
 
