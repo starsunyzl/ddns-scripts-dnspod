@@ -5,7 +5,7 @@
 1. 安装 OpenWrt 官方 DDNS 客户端和其它依赖包：  
 `opkg install luci-app-ddns bind-host curl openssl-util`
 2. 下载最新的插件包：  
-`https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip`
+[`https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip`](https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip)
 3. 将插件包中的 `usr` 目录上传到 OpenWrt 根目录 `/`
 4. 设置执行权限：  
 `chmod 755 /usr/lib/ddns/update_dnspod.sh`
@@ -15,13 +15,13 @@
 
 ## 使用
 
-OpenWrt 魔改版众多，以原版为例。登录 OpenWrt 网页，导航到 Services / Dynamic DNS 页面，点击 Add new services 添加服务，IPv4和IPv6需要分别单独添加服务，DDNS Service provider 选择 dnspod（通常在列表最末尾），Create service 后填写如下 Basic Settings 项：
+ 以原版 OpenWrt 为例，登录 OpenWrt 后台管理页面，导航到 Services / Dynamic DNS 页面，点击 Add new services 添加服务，IPv4 和 IPv6 需要分别添加服务，DDNS Service provider 选择 dnspod（通常在列表最末尾），Create service 后填写如下 Basic Settings 项：
 
 - Lookup Hostname：`完整域名`，用于检测对应的 IP 是否需要更新。例：`www.example.com`、`example.com`
 - Domain：要更新的 `主机记录@主域名`，例：`www@example.com`，省略 `主机记录` 则更新 `主域名`，例：`@example.com` 或 `example.com`
 - Username：你的腾讯云 API 密钥 `SecretId`
 - Password：你的腾讯云 API 密钥 `SecretKey`
-- Optional Encoded Parameter：选填，要更新的记录 `RecordId`，不填则自动获取。当一个主机记录有多个记录类型相同的 IP 记录值时，必须填写此项指定要更新哪一条记录。可在 Log File Viewer 中查看所有记录的 `RecordId`（需要设置系统日志输出级别为 Debug 并运行一遍插件）
+- Optional Encoded Parameter：选填，要更新的记录 `RecordId`，不填则自动获取。当一个主机记录有多个记录类型相同的 IP 记录值时，必须填写此项指定要更新哪一条记录。可在 Log File Viewer 中查看所有记录的 `RecordId`（需要设置 OpenWrt 系统日志输出级别为 Debug 并运行一遍插件）
 
 其他项如代理、更新间隔时间等根据自身需求填写，使用 IPv6 时需要在 Advanced Settings / Network 选择对应的网络接口。
 
