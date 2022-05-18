@@ -1,8 +1,8 @@
-适用于 OpenWrt 官方 DDNS 客户端（[ddns-scripts](https://openwrt.org/docs/guide-user/base-system/ddns) ）的腾讯云 DNSPod 动态域名更新插件，使用全新的 [腾讯云 API 3.0](https://cloud.tencent.com/document/api/1427/56193) 接口，支持 IPv6，支持多 IP 记录值。
+适用于 [OpenWrt 官方 DDNS 客户端](https://openwrt.org/docs/guide-user/base-system/ddns) 的腾讯云（DNSPod）DDNS 动态域名更新插件，使用全新的 [腾讯云 API 3.0](https://cloud.tencent.com/document/api/1427/56193) 接口，支持 IPv6，支持多 IP 记录值。
 
 ## 安装
 
-1. 安装 OpenWrt 官方 DDNS 客户端和其它依赖包：  
+1. 安装 OpenWrt 官方 DDNS 客户端和依赖包：  
 `opkg install luci-app-ddns bind-host curl openssl-util`
 2. 下载最新的插件包：  
 [`https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip`](https://github.com/starsunyzl/ddns-scripts-dnspod/archive/refs/heads/main.zip)
@@ -15,7 +15,7 @@
 
 ## 使用
 
- 以原版 OpenWrt 为例，登录 OpenWrt 后台管理页面，导航到 Services / Dynamic DNS 页面，点击 Add new services 添加服务，IPv4 和 IPv6 需要分别添加服务，DDNS Service provider 选择 dnspod（通常在列表最末尾），Create service 后填写如下 Basic Settings 项：
+ 以原版 OpenWrt 为例，登录 OpenWrt 后台管理页面，导航到 Services / Dynamic DNS 页面，点击 Add new services 添加服务，IPv4 和 IPv6 需要分别添加服务，DDNS Service provider 选择 `dnspod`（通常在列表末尾），Create service 后填写如下 Basic Settings 项：
 
 - Lookup Hostname：`完整域名`，用于检测对应的 IP 是否需要更新。例：`www.example.com`、`example.com`
 - Domain：要更新的 `主机记录@主域名`，例：`www@example.com`，省略 `主机记录` 则更新 `主域名`，例：`@example.com` 或 `example.com`
