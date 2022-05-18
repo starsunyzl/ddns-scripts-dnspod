@@ -19,8 +19,8 @@
 
 - Lookup Hostname：`完整域名`，用于检测对应的 IP 是否需要更新。例：`www.example.com`、`example.com`
 - Domain：要更新的 `主机记录@主域名`，例：`www@example.com`，省略 `主机记录` 则更新 `主域名`，例：`@example.com` 或 `example.com`
-- Username：你的腾讯云 API 密钥 `SecretId`
-- Password：你的腾讯云 API 密钥 `SecretKey`
+- Username：你的腾讯云用户 API 密钥 `SecretId`
+- Password：你的腾讯云用户 API 密钥 `SecretKey`
 - Optional Encoded Parameter：选填，要更新的记录 `RecordId`，不填则自动获取。当一个主机记录有多个记录类型相同的 IP 记录值时，必须填写此项指定要更新哪一条记录。可在 Log File Viewer 中查看所有记录的 `RecordId`（需要设置 OpenWrt 系统日志输出级别为 Debug 并运行一遍插件）
 
 其他项如代理、更新间隔时间等根据自身需求填写，使用 IPv6 时需要在 Advanced Settings / Network 选择对应的网络接口。
